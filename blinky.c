@@ -21,90 +21,109 @@
 // This is part of revision 2.2.0.295 of the EK-TM4C123GXL Firmware Package.
 //
 //*****************************************************************************
-
 #include <stdint.h>
 #include <stdbool.h>
 #include "inc/hw_memmap.h"
 #include "driverlib/debug.h"
 #include "driverlib/gpio.h"
 #include "driverlib/sysctl.h"
+#include "inc/hw_types.h"
+#include "inc/hw_gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/rom_map.h"
+#include "driverlib/timer.h"     // For Timer functions
+#include "driverlib/interrupt.h" // For interrupt functions
+#include "driverlib/sysctl.h"    // For system control (clock, peripherals)
 
-//*****************************************************************************
-//
-//! \addtogroup example_list
-//! <h1>Blinky (blinky)</h1>
-//!
-//! A very simple example that blinks the on-board LED using direct register
-//! access.
-//
-//*****************************************************************************
 
-//*****************************************************************************
-//
-// The error routine that is called if the driver library encounters an error.
-//
-//*****************************************************************************
-#ifdef DEBUG
-void
-__error__(char *pcFilename, uint32_t ui32Line)
+void PortFunctionInit(void);
+void scan();
+
+// "scan.s"  is assembly code version that turns on the LED if the button is pushed, its the lower right button
+int main(void) {
+    // Initialize GPIO
+    PortFunctionInit();
+
+    while (1) {
+        scan();
+    }
+}
+
+// here is a "C" code version that turns on the LED if the button is pushed, its the lower right button
+#if 0
+
+
+#define LED_PIN GPIO_PIN_3
+#define BUTTON_PIN GPIO_PIN_0
+void cscan();
+
+int main(void) {
+    // Initialize GPIO
+    PortFunctionInit();
+
+    volatile int i = 0;
+    while (1) {
+        cscan();
+    }
+}
+void cscan()
 {
-    while(1);
+    // Read the button state (0 if pressed, 1 if not pressed due to pull-up)
+     if (GPIOPinRead(GPIO_PORTF_BASE, BUTTON_PIN) == 0) {
+         // Button pressed, turn on LED
+         GPIOPinWrite(GPIO_PORTF_BASE, LED_PIN, LED_PIN);
+     } else {
+         // Button not pressed, turn off LED
+         GPIOPinWrite(GPIO_PORTF_BASE, LED_PIN, 0);
+     }
 }
 #endif
+
+
+// io.s is a "blinky" using the assembly.
+#if 0
+
 void toggle(const int flag);
-//*****************************************************************************
-//
-// Blink the on-board LED.
-//
-//*****************************************************************************
-int
-main(void)
-{
-    volatile uint32_t ui32Loop;
 
-    //
-    // Enable the GPIO port that is used for the on-board LED.
-    //
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+int main(void) {
+    // Initialize GPIO
+    PortFunctionInit();
 
-    //
-    // Check if the peripheral access is enabled.
-    //
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))
-    {
-    }
+    volatile int i = 0;
+    while (1) {
+           // Blinky mode with a delay loop
+           for (i=0; i < 2000000; i++) {
+               // Simple delay loop
+           }
+           toggle(1);  // Turn on the LED
 
-    //
-    // Enable the GPIO pin for the LED (PF3).  Set the direction as output, and
-    // enable the GPIO pin for digital function.
-    //
-    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_3);
-
-    //
-    // Loop forever.
-    //
-    while(1)
-    {
-        //
-        // Turn on the LED.
-        //
-        toggle(1);
-        //
-        // Delay for a bit.
-        //
-
-        for(ui32Loop = 0; ui32Loop < 200000; ui32Loop++)
-        {
-        }
-        //
-        // Turn off the LED.
-        //
-        toggle(0);
-        //
-        // Delay for a bit.
-        //
-        for(ui32Loop = 0; ui32Loop < 200000; ui32Loop++)
-        {
-        }
+           for (i = 0; i < 2000000; i++) {
+               // Simple delay loop
+           }
+           toggle(0);  // Turn off the LED
     }
 }
+#endif
+
+
+
+
+void PortFunctionInit(void) {
+    // Set system clock to 50MHz
+    SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+
+    // Enable peripheral for GPIOF (buttons and LED)
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+
+    // Unlock PF0 because it is locked by default
+    HWREG(GPIO_PORTF_BASE + GPIO_O_LOCK) = GPIO_LOCK_KEY;
+    HWREG(GPIO_PORTF_BASE + GPIO_O_CR) |= BUTTON_PIN;
+
+    // Configure PF0 as input with pull-up resistor
+    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, BUTTON_PIN);
+    GPIOPadConfigSet(GPIO_PORTF_BASE, BUTTON_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
+
+    // Configure PF3 (LED) as output
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, LED_PIN);
+}
+
